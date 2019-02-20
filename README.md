@@ -1,6 +1,6 @@
-# XRP Transactions Exporter
+# UTXO Transactions Exporter
 
-This code allows you to fetc all transactions from the XRP ledger and dump it into kafka.
+This code allows you to fetch all transactions from UTXO based blockchains to kafka.
 
 ## Running the service
 

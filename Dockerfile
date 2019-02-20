@@ -23,17 +23,7 @@ RUN npm install --production
 
 FROM node:9.11.1-alpine
 
-RUN apk --no-cache add \
-      bash \
-      g++ \
-      ca-certificates \
-      lz4-dev \
-      musl-dev \
-      cyrus-sasl-dev \
-      openssl-dev \
-      make \
-      python \
-      git
+RUN apk --no-cache add libsasl openssl lz4-libs
 
 WORKDIR /app
 

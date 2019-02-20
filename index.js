@@ -44,7 +44,6 @@ const sendRequest = (async (method, params) => {
     }
   }).then(({ result, error }) => {
     metrics.requestsResponseTime.observe(new Date() - startTime)
-    console.log(`Response of ${method} in ${new Date() - startTime}`)
 
     if(error) {
       return Promise.reject(error)

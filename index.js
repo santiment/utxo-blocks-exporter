@@ -2,40 +2,49 @@ const pkg = require('./package.json');
 const { send } = require('micro')
 const url = require('url')
 const { Exporter } = require('san-exporter')
-const rp = require('request-promise')
+const rp = require('request-promise-native')
 const uuidv1 = require('uuid/v1')
 const metrics = require('./src/metrics')
 
 const exporter = new Exporter(pkg.name)
 
-const SEND_BATCH_SIZE = parseInt(process.env.SEND_BATCH_SIZE || "30")
-const DEFAULT_TIMEOUT = parseInt(process.env.DEFAULT_WS_TIMEOUT || "1000")
-const CONNECTIONS_COUNT = parseInt(process.env.CONNECTIONS_COUNT || "1")
-const NODE_URL = process.env.NODE_URL || 'litecoind.default.svc.cluster.local'
+const SEND_BATCH_SIZE = parseInt(process.env.SEND_BATCH_SIZE || "10")
+const DEFAULT_TIMEOUT = parseInt(process.env.DEFAULT_TIMEOUT || "10000")
+const NODE_URL = process.env.NODE_URL || 'http://litecoind.default.svc.cluster.local:9332'
+const RPC_USERNAME = process.env.RPC_USERNAME || 'rpcuser'
+const RPC_PASSWORD = process.env.RPC_PASSWORD || 'rpcpassword'
+
+const request = rp.defaults({
+  method: 'POST',
+  uri: NODE_URL,
+  auth: {
+    user: RPC_USERNAME,
+    pass: RPC_PASSWORD
+  },
+  timeout: DEFAULT_TIMEOUT,
+  time: true,
+  gzip: true,
+  json: true
+})
 
 let lastProcessedPosition = {
   blockNumber: parseInt(process.env.BLOCK || "1"),
 }
 
-console.log('Fetch XRPL transactions')
-
-const connectionSend = (async (method, params) => {
+const sendRequest = (async (method, params) => {
   metrics.requestsCounter.inc()
 
   const startTime = new Date()
-  rp({
-    method: 'POST',
-    uri: NODE_URL,
+  return request({
     body: {
       jsonrpc: '1.0',
       id: uuidv1(),
       method: method,
       params: params
-    },
-    timeout: DEFAULT_TIMEOUT,
-    json: true
-  }).then(({result, error}) => {
+    }
+  }).then(({ result, error }) => {
     metrics.requestsResponseTime.observe(new Date() - startTime)
+    console.log(`Response of ${method} in ${new Date() - startTime}`)
 
     if(error) {
       return Promise.reject(error)
@@ -46,14 +55,14 @@ const connectionSend = (async (method, params) => {
 })
   
 const fetchBlock = async (block_index) => {
-  let blockHash = await connectionSend('getblockhash', [block_index])
-  return await connectionSend('getblock', [blockHash, 2])
+  let blockHash = await sendRequest('getblockhash', [block_index])
+  return await sendRequest('getblock', [blockHash, 2])
 }
 
 async function work() {
-  const currentBlockReq = await connectionSend('getblockchaininfo', [])
+  const blockchainInfo = await sendRequest('getblockchaininfo', [])
+  const currentBlock = blockchainInfo.blocks
 
-  const currentBlock = currentBlockReq.result.blocks
   metrics.currentBlock.set(currentBlock)
 
   const requests = []
@@ -73,10 +82,10 @@ async function work() {
         return block
       })
 
-      console.log(`Flushing blocks ${blocks[0].height}:${blocks[ledgers.length - 1].height}`)
-      await exporter.sendDataWithKey(ledgers, "height")
+      console.log(`Flushing blocks ${blocks[0].height}:${blocks[blocks.length - 1].height}`)
+      await exporter.sendDataWithKey(blocks, "height")
 
-      lastProcessedPosition.blockNumber += ledgers.length
+      lastProcessedPosition.blockNumber += blocks.length
       await exporter.savePosition(lastProcessedPosition)
       metrics.lastExportedBlock.set(lastProcessedPosition.blockNumber)
 

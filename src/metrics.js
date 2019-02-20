@@ -1,7 +1,7 @@
 var {Counter, Gauge, Summary} = require('prom-client')
 
 module.exports.downloadedTransactionsCounter = new Counter({
-    name: 'downloaded_blocks_count',
+    name: 'downloaded_transactions_count',
     help: 'Number of transactions downloaded'
 });
 

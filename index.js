@@ -10,6 +10,7 @@ const exporter = new Exporter(pkg.name)
 
 const SEND_BATCH_SIZE = parseInt(process.env.SEND_BATCH_SIZE || "10")
 const DEFAULT_TIMEOUT = parseInt(process.env.DEFAULT_TIMEOUT || "10000")
+const CONFIRMATIONS = parseInt(process.env.CONFIRMATIONS || "3")
 const NODE_URL = process.env.NODE_URL || 'http://litecoind.default.svc.cluster.local:9332'
 const RPC_USERNAME = process.env.RPC_USERNAME || 'rpcuser'
 const RPC_PASSWORD = process.env.RPC_PASSWORD || 'rpcpassword'
@@ -60,13 +61,11 @@ const fetchBlock = async (block_index) => {
 
 async function work() {
   const blockchainInfo = await sendRequest('getblockchaininfo', [])
-  const currentBlock = blockchainInfo.blocks
+  const currentBlock = blockchainInfo.blocks - CONFIRMATIONS
 
   metrics.currentBlock.set(currentBlock)
 
   const requests = []
-
-  console.info(`Fetching transfers for interval ${lastProcessedPosition.blockNumber}:${currentBlock}`)
 
   while (lastProcessedPosition.blockNumber + requests.length < currentBlock) {
     const blockToDownload = lastProcessedPosition.blockNumber + requests.length
@@ -108,8 +107,6 @@ async function initLastProcessedLedger() {
 const fetchEvents = () => {
   return work()
     .then(() => {
-      console.log(`Progressed to position ${JSON.stringify(lastProcessedPosition)}`)
-
       // Look for new events every 1 sec
       setTimeout(fetchEvents, 1000)
     })

@@ -23,7 +23,7 @@
     "prom-client": "^11.2.1",
     "request": "^2.88.0",
     "request-promise-native": "^1.0.7",
-    "san-exporter": "git+https://github.com/santiment/san-exporter.git#allow-setting-max-message-size",
+    "san-exporter": "git+https://github.com/santiment/san-exporter.git",
     "uuid": "^3.3.2"
   },
   "scripts": {

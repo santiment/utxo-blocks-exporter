@@ -10,7 +10,6 @@ const exporter = new Exporter(pkg.name)
 
 const SEND_BATCH_SIZE = parseInt(process.env.SEND_BATCH_SIZE || "10")
 const DEFAULT_TIMEOUT = parseInt(process.env.DEFAULT_TIMEOUT || "10000")
-const CONFIRMATIONS = parseInt(process.env.CONFIRMATIONS || "3")
 const NODE_URL = process.env.NODE_URL || 'http://litecoind.default.svc.cluster.local:9332'
 const RPC_USERNAME = process.env.RPC_USERNAME || 'rpcuser'
 const RPC_PASSWORD = process.env.RPC_PASSWORD || 'rpcpassword'
@@ -28,8 +27,8 @@ const request = rp.defaults({
   json: true
 })
 
-let lastProcessedPosition = {
-  blockNumber: parseInt(process.env.BLOCK || "1"),
+let lastProcessed = {
+  blockNumber: parseInt(process.env.BLOCK || "1"), //TODO Shoul it be "0"
 }
 
 const sendRequest = (async (method, params) => {
@@ -53,24 +52,73 @@ const sendRequest = (async (method, params) => {
     return result
   })
 })
-  
-const fetchBlock = async (block_index) => {
-  let blockHash = await sendRequest('getblockhash', [block_index])
+
+const fetchBlockHashByIndex = async (blockIndex) => {
+  return await sendRequest('getblockhash', [blockIndex])
+}
+
+const fetchBlockByHash = async (blockHash) => {
   return await sendRequest('getblock', [blockHash, 2])
 }
 
+const fetchBlockByIndex = async (blockIndex) => {
+  let blockHash = await fetchBlockHashByIndex(blockIndex)
+  return await fetchBlockByHash(blockHash)
+}
+
+async function rollbackOrphans() {
+  let blocks = []
+  let lastProcessedHash = lastProcessed.blockHash
+  let lastExportedBlock = await fetchBlockByHash(lastProcessedHash);
+
+  while (lastExportedBlock.confirmations === -1) {
+    blocks.unshift(lastExportedBlock)
+    lastProcessedHash = lastExportedBlock.previousblockhash
+    lastExportedBlock = await fetchBlockByHash(lastProcessedHash);
+  }
+  if(blocks.length) {
+
+    // TODO find if we need to decrement this counter
+    // TODO in that case it would be better to change to Gauge
+
+    // const blocks = await Promise.all(blocks).map(async (block) => {
+    //   metrics.downloadedTransactionsCounter.dec(block.tx.length)
+    //   metrics.downloadedBlocksCounter.dec()
+
+    //   return block
+    // })
+
+    console.info(`Rollback blocks ${blocks[0].height}:${blocks[blocks.length - 1].height}`)
+    await exporter.sendDataWithKey(blocks, "height")
+
+    lastProcessed.blockNumber -= blocks.length
+    lastProcessed.blockHash = lastProcessedHash
+    await saveNewPosition()
+  }
+}
+
+
+async function saveNewPosition()  {
+  await exporter.savePosition(lastProcessed)
+  metrics.lastExportedBlock.set(lastProcessed.blockNumber)
+}
+
+
 async function work() {
+  await rollbackOrphans()
+
   const blockchainInfo = await sendRequest('getblockchaininfo', [])
-  const currentBlock = blockchainInfo.blocks - CONFIRMATIONS
+  const currentBlock = blockchainInfo.blocks
 
   metrics.currentBlock.set(currentBlock)
 
   const requests = []
 
-  while (lastProcessedPosition.blockNumber + requests.length < currentBlock) {
-    const blockToDownload = lastProcessedPosition.blockNumber + requests.length
+  while (lastProcessed.blockNumber + requests.length <= currentBlock) {
+    const blockToDownload = lastProcessed.blockNumber + requests.length
+    console.info(`block to download ${blockToDownload}`)
 
-    requests.push(fetchBlock(blockToDownload))
+    requests.push(fetchBlockByIndex(blockToDownload))
 
     if (requests.length >= SEND_BATCH_SIZE || blockToDownload == currentBlock) {
       const blocks = await Promise.all(requests).map(async (block) => {
@@ -80,12 +128,13 @@ async function work() {
         return block
       })
 
-      console.log(`Flushing blocks ${blocks[0].height}:${blocks[blocks.length - 1].height}`)
+      console.info(`Flushing blocks ${blocks[0].height}:${blocks[blocks.length - 1].height}`)
       await exporter.sendDataWithKey(blocks, "height")
 
-      lastProcessedPosition.blockNumber += blocks.length
-      await exporter.savePosition(lastProcessedPosition)
-      metrics.lastExportedBlock.set(lastProcessedPosition.blockNumber)
+      lastProcessed.blockNumber += blocks.length
+      lastProcessed.blockHash = blocks[blocks.length - 1].hash
+      await exporter.savePosition(lastProcessed)
+      metrics.lastExportedBlock.set(lastProcessed.blockNumber)
 
       requests.length = 0
     }
@@ -96,11 +145,19 @@ async function initLastProcessedLedger() {
   const lastPosition = await exporter.getLastPosition()
 
   if (lastPosition) {
-    lastProcessedPosition = lastPosition
-    console.info(`Resuming export from position ${JSON.stringify(lastPosition)}`)
+    lastProcessed = lastPosition
+  }
+  if (!lastProcessed.blockHash) {
+    lastProcessed.blockHash = await fetchBlockHashByIndex(
+      lastProcessed.blockNumber
+    )
+  }
+
+  if (lastPosition) {
+    console.info(`Resuming export from position ${JSON.stringify(lastProcessed)}`)
   } else {
-    await exporter.savePosition(lastProcessedPosition)
-    console.info(`Initialized exporter with initial position ${JSON.stringify(lastProcessedPosition)}`)
+    await exporter.savePosition(lastProcessed)
+    console.info(`Initialized exporter with initial position ${JSON.stringify(lastProcessed)}`)
   }
 }
 

@@ -82,7 +82,7 @@ async function rollbackOrphans() {
     // TODO in that case it would be better to change to Gauge
 
     // const blocks = await Promise.all(blocks).map(async (block) => {
-    //   metrics.downloadedTransactionsCounter.dec(block.tx.length)
+    //   metrics.downloadedTransactionsCounter.dec(block.nTx)
     //   metrics.downloadedBlocksCounter.dec()
 
     //   return block
@@ -122,7 +122,7 @@ async function work() {
 
     if (requests.length >= SEND_BATCH_SIZE || blockToDownload == currentBlock) {
       const blocks = await Promise.all(requests).map(async (block) => {
-        metrics.downloadedTransactionsCounter.inc(block.tx.length)
+        metrics.downloadedTransactionsCounter.inc(block.nTx)
         metrics.downloadedBlocksCounter.inc()
 
         return block

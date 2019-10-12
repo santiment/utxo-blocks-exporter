@@ -67,7 +67,7 @@ async function work() {
 
   const requests = []
 
-  while (lastProcessedPosition.blockNumber + requests.length < currentBlock) {
+  while (lastProcessedPosition.blockNumber + requests.length <= currentBlock) {
     const blockToDownload = lastProcessedPosition.blockNumber + requests.length
 
     requests.push(fetchBlock(blockToDownload))

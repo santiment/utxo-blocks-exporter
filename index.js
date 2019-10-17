@@ -1,7 +1,7 @@
 const pkg = require('./package.json');
 const { send } = require('micro')
 const url = require('url')
-const { Exporter } = require('san-exporter')
+const { Exporter } = require('@santiment-network/san-exporter')
 const rp = require('request-promise-native')
 const uuidv1 = require('uuid/v1')
 const metrics = require('./src/metrics')
@@ -46,14 +46,14 @@ const sendRequest = (async (method, params) => {
   }).then(({ result, error }) => {
     metrics.requestsResponseTime.observe(new Date() - startTime)
 
-    if(error) {
+    if (error) {
       return Promise.reject(error)
     }
 
     return result
   })
 })
-  
+
 const fetchBlock = async (block_index) => {
   let blockHash = await sendRequest('getblockhash', [block_index])
   return await sendRequest('getblock', [blockHash, 2])

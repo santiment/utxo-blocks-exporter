@@ -18,15 +18,15 @@
   },
   "homepage": "https://github.com/santiment/utxo-blocks-exporter",
   "dependencies": {
+    "@santiment-network/san-exporter": "0.0.5",
     "micro": "^9.3.3",
     "p-queue": "^3.0.0",
     "prom-client": "^11.2.1",
     "request": "^2.88.0",
     "request-promise-native": "^1.0.7",
-    "san-exporter": "git+https://github.com/santiment/san-exporter.git",
     "uuid": "^3.3.2"
   },
   "scripts": {
-    "start": "micro -l tcp://0.0.0.0:3000"
+    "start": "./node_modules/.bin/micro -l tcp://0.0.0.0:3000"
   }
 }

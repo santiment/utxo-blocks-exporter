@@ -14,6 +14,7 @@ const CONFIRMATIONS = parseInt(process.env.CONFIRMATIONS || "3")
 const NODE_URL = process.env.NODE_URL || 'http://litecoind.default.svc.cluster.local:9332'
 const RPC_USERNAME = process.env.RPC_USERNAME || 'rpcuser'
 const RPC_PASSWORD = process.env.RPC_PASSWORD || 'rpcpassword'
+const EXPORT_TIMEOUT_MLS = parseInt(process.env.EXPORT_TIMEOUT_MLS || 1000 * 60 * 15)     // 15 minutes
 
 const request = rp.defaults({
   method: 'POST',
@@ -27,6 +28,10 @@ const request = rp.defaults({
   gzip: true,
   json: true
 })
+
+// To prevent healthcheck failing during initialization and processing first part of data,
+// we set lastExportTime to current time.
+let lastExportTime = Date.now()
 
 let lastProcessedPosition = {
   blockNumber: parseInt(process.env.BLOCK || "1"),
@@ -83,6 +88,7 @@ async function work() {
       console.log(`Flushing blocks ${blocks[0].height}:${blocks[blocks.length - 1].height}`)
       await exporter.sendDataWithKey(blocks, "height")
 
+      lastExportTime = Date.now()
       lastProcessedPosition.blockNumber += blocks.length
       await exporter.savePosition(lastProcessedPosition)
       metrics.lastExportedBlock.set(lastProcessedPosition.blockNumber)
@@ -122,13 +128,22 @@ const init = async () => {
 init()
 
 const healthcheckKafka = () => {
-  return new Promise((resolve, reject) => {
-    if (exporter.producer.isConnected()) {
-      resolve()
+  if (exporter.producer.isConnected()) {
+      return Promise.resolve()
+  } else {
+      return Promise.reject("Kafka client is not connected to any brokers")
+  }
+}
+
+const healthcheckExportTimeout = () => {
+    const timeFromLastExport = Date.now() - lastExportTime
+    const isExportTimeoutExceeded = timeFromLastExport > EXPORT_TIMEOUT_MLS
+    if (isExportTimeoutExceeded) {
+        const msg = `Time from the last export ${timeFromLastExport}ms exceeded limit  ${EXPORT_TIMEOUT_MLS}ms.`
+        return Promise.reject(msg)
     } else {
-      reject("Kafka client is not connected to any brokers")
+        return Promise.resolve()
     }
-  })
 }
 
 module.exports = async (request, response) => {
@@ -136,9 +151,10 @@ module.exports = async (request, response) => {
 
   switch (req.pathname) {
     case '/healthcheck':
-      return healthcheckKafka()
+    return healthcheckKafka()
+        .then(() => healthcheckExportTimeout())
         .then(() => send(response, 200, "ok"))
-        .catch((err) => send(response, 500, `Connection to kafka failed: ${err}`))
+        .catch((err) => send(response, 500, err.toString()))
 
     case '/metrics':
       response.setHeader('Content-Type', metrics.register.contentType);

@@ -29,7 +29,8 @@ const request = rp.defaults({
   json: true
 })
 
-// To prevent healthcheck failing during initialization and processing first part of data, we set lastExportTime to current time.
+// To prevent healthcheck failing during initialization and processing first part of data,
+// we set lastExportTime to current time.
 let lastExportTime = Date.now()
 
 let lastProcessedPosition = {
@@ -138,7 +139,8 @@ const healthcheckExportTimeout = () => {
     const timeFromLastExport = Date.now() - lastExportTime
     const isExportTimeoutExceeded = timeFromLastExport > EXPORT_TIMEOUT_MLS
     if (isExportTimeoutExceeded) {
-        return Promise.reject(`Time from the last export ${timeFromLastExport}ms exceeded limit  ${EXPORT_TIMEOUT_MLS}ms.`)
+        const msg = `Time from the last export ${timeFromLastExport}ms exceeded limit  ${EXPORT_TIMEOUT_MLS}ms.`
+        return Promise.reject(msg)
     } else {
         return Promise.resolve()
     }

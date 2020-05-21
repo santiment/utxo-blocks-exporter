@@ -14,7 +14,7 @@ const CONFIRMATIONS = parseInt(process.env.CONFIRMATIONS || "3")
 const NODE_URL = process.env.NODE_URL || 'http://litecoind.default.svc.cluster.local:9332'
 const RPC_USERNAME = process.env.RPC_USERNAME || 'rpcuser'
 const RPC_PASSWORD = process.env.RPC_PASSWORD || 'rpcpassword'
-const EXPORT_TIMEOUT_MLS = parseInt(process.env.EXPORT_TIMEOUT_MLS || 1000 * 60 * 5)     // 5 minutes
+const EXPORT_TIMEOUT_MLS = parseInt(process.env.EXPORT_TIMEOUT_MLS || 1000 * 60 * 15)     // 5 minutes
 
 const request = rp.defaults({
   method: 'POST',

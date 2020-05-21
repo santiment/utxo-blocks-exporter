@@ -18,8 +18,10 @@ services:
     build: .
     volumes:
       - ./:/app
+      - /app/node_modules
     environment:
       KAFKA_URL: kafka:9092
       ZOOKEEPER_URL: zookeeper:2181
       SEND_BATCH_SIZE: 1
       DEFAULT_TIMEOUT: 2000
+      NODE_URL: http://litecoind-bitcoind.default.svc.cluster.local:9332

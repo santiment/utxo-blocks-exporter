@@ -1,10 +1,10 @@
 const pkg = require('./package.json');
 const { send } = require('micro')
 const url = require('url')
-const { Exporter } = require('@santiment-network/san-exporter')
+const { Exporter } = require('san-exporter')
+const metrics = require('san-exporter/metrics')
 const rp = require('request-promise-native')
 const uuidv1 = require('uuid/v1')
-const metrics = require('./src/metrics')
 const { logger } = require('./logger')
 
 const exporter = new Exporter(pkg.name)

@@ -121,6 +121,7 @@ const fetchEvents = () => {
 
 const init = async () => {
   metrics.startCollection()
+  metrics.restartCounter.inc()
   await exporter.connect()
   await initLastProcessedLedger()
   await fetchEvents()

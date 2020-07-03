@@ -24,9 +24,10 @@
     "prom-client": "^11.2.1",
     "request": "^2.88.0",
     "request-promise-native": "^1.0.7",
-    "uuid": "^3.3.2"
+    "uuid": "^3.3.2",
+    "node-json-logger": "0.0.10"
   },
   "scripts": {
-    "start": "./node_modules/.bin/micro -l tcp://0.0.0.0:3000"
+    "start": "micro -l tcp://0.0.0.0:3000"
   }
 }

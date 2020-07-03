@@ -5,13 +5,14 @@ const { Exporter } = require('@santiment-network/san-exporter')
 const rp = require('request-promise-native')
 const uuidv1 = require('uuid/v1')
 const metrics = require('./src/metrics')
+const { logger } = require('./logger')
 
 const exporter = new Exporter(pkg.name)
 
 const SEND_BATCH_SIZE = parseInt(process.env.SEND_BATCH_SIZE || "10")
 const DEFAULT_TIMEOUT = parseInt(process.env.DEFAULT_TIMEOUT || "10000")
 const CONFIRMATIONS = parseInt(process.env.CONFIRMATIONS || "3")
-const NODE_URL = process.env.NODE_URL || 'http://litecoind.default.svc.cluster.local:9332'
+const NODE_URL = process.env.NODE_URL || 'http://litecoin.stage.san:30992'
 const RPC_USERNAME = process.env.RPC_USERNAME || 'rpcuser'
 const RPC_PASSWORD = process.env.RPC_PASSWORD || 'rpcpassword'
 const EXPORT_TIMEOUT_MLS = parseInt(process.env.EXPORT_TIMEOUT_MLS || 1000 * 60 * 15)     // 15 minutes
@@ -85,7 +86,7 @@ async function work() {
         return block
       })
 
-      console.log(`Flushing blocks ${blocks[0].height}:${blocks[blocks.length - 1].height}`)
+      logger.info(`Flushing blocks ${blocks[0].height}:${blocks[blocks.length - 1].height}`)
       await exporter.sendDataWithKey(blocks, "height")
 
       lastExportTime = Date.now()
@@ -103,10 +104,10 @@ async function initLastProcessedLedger() {
 
   if (lastPosition) {
     lastProcessedPosition = lastPosition
-    console.info(`Resuming export from position ${JSON.stringify(lastPosition)}`)
+    logger.info(`Resuming export from position ${JSON.stringify(lastPosition)}`)
   } else {
     await exporter.savePosition(lastProcessedPosition)
-    console.info(`Initialized exporter with initial position ${JSON.stringify(lastProcessedPosition)}`)
+    logger.info(`Initialized exporter with initial position ${JSON.stringify(lastProcessedPosition)}`)
   }
 }
 

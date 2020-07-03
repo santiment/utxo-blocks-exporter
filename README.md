@@ -4,18 +4,14 @@ This code allows you to fetch all transactions from UTXO based blockchains to ka
 
 ## Setup
 
-Because all data is fetched from public end-point, so no need to use k8s proxy or vpn to run the service locally.  
+Because all data is fetched from public end-point, so no need to use k8s proxy or vpn to run the service locally.
 
 You need to have access to a full node to run this. The easiest way to get access to one is to use the Litecoind server we have on staging. The easiest way to access is via [VPN](https://community.santiment.net/t/openvpn-instructions/272).
 
-## Running the service
-
-The easiest way to run the service is using `docker-compose`:
-
-Example:
+## Run
 
 ```bash
-$ docker-compose up --build
+$ ./bin/run.sh
 ```
 
 ## Configure

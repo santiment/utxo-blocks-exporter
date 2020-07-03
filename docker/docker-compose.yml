@@ -1,4 +1,4 @@
-version: '2'
+version: "2"
 services:
   zookeeper:
     image: wurstmeister/zookeeper
@@ -15,10 +15,19 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
   exporter:
-    build: .
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile
+      args:
+        NODE_ENV: development
+    depends_on:
+      - zookeeper
+      - kafka
     volumes:
-      - ./:/app
-      - /app/node_modules
+      - ../:/opt/node_app/app:delegated
+      - ../package.json:/opt/node_app/package.json
+      - ../package-lock.json:/opt/node_app/package-lock.json
+      - notused:/opt/node_app/app/node_modules
     environment:
       KAFKA_URL: kafka:9092
       ZOOKEEPER_URL: zookeeper:2181
@@ -28,3 +37,8 @@ services:
     ports:
       # port for checking health.
       - "127.0.0.1:3000:3000"
+    entrypoint: "/bin/sh"
+    command: ["-c", "docker/wait_for_services.sh && npm start"]
+
+volumes:
+  notused:

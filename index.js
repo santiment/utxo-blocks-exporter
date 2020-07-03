@@ -5,6 +5,7 @@ const { Exporter } = require('@santiment-network/san-exporter')
 const rp = require('request-promise-native')
 const uuidv1 = require('uuid/v1')
 const metrics = require('./src/metrics')
+const { logger } = require('./logger')
 
 const exporter = new Exporter(pkg.name)
 
@@ -85,7 +86,7 @@ async function work() {
         return block
       })
 
-      console.log(`Flushing blocks ${blocks[0].height}:${blocks[blocks.length - 1].height}`)
+      logger.info(`Flushing blocks ${blocks[0].height}:${blocks[blocks.length - 1].height}`)
       await exporter.sendDataWithKey(blocks, "height")
 
       lastExportTime = Date.now()
@@ -103,10 +104,10 @@ async function initLastProcessedLedger() {
 
   if (lastPosition) {
     lastProcessedPosition = lastPosition
-    console.info(`Resuming export from position ${JSON.stringify(lastPosition)}`)
+    logger.info(`Resuming export from position ${JSON.stringify(lastPosition)}`)
   } else {
     await exporter.savePosition(lastProcessedPosition)
-    console.info(`Initialized exporter with initial position ${JSON.stringify(lastProcessedPosition)}`)
+    logger.info(`Initialized exporter with initial position ${JSON.stringify(lastProcessedPosition)}`)
   }
 }
 

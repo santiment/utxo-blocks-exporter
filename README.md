@@ -2,13 +2,9 @@
 
 This code allows you to fetch all transactions from UTXO based blockchains to kafka.
 
-## Setup
-
-Because all data is fetched from public end-point, so no need to use k8s proxy or vpn to run the service locally.
-
-You need to have access to a full node to run this. The easiest way to get access to one is to use the Litecoind server we have on staging. The easiest way to access is via [VPN](https://community.santiment.net/t/openvpn-instructions/272).
-
 ## Run
+
+You need to have access to a full node. By default `NODE_URL` in docker-compose points to the staging instance.
 
 ```bash
 $ ./bin/run.sh
@@ -25,7 +21,6 @@ You can configure the service with the following ENV variables:
 * CONFIRMATIONS - Number of confirmations to ways until the data is exported. An easy way to handle blockchain reorganizations. Default: `3`
 * BLOCK - The block numer from which to start exporting the events. Default: `1`
 * EXPORT\_TIMEOUT\_MLS - max time interval between successful data pushing to kafka to treat the service as healthy. Default: `1000 * 60 * 15, 15 minutes`
-
 
 #### Health checks
 

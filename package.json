@@ -28,6 +28,6 @@
     "node-json-logger": "0.0.10"
   },
   "scripts": {
-    "start": "./node_modules/.bin/micro -l tcp://0.0.0.0:3000"
+    "start": "micro -l tcp://0.0.0.0:3000"
   }
 }

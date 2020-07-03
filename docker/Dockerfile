@@ -17,22 +17,24 @@ RUN apk --no-cache add \
 
 RUN apk add --no-cache --virtual .build-deps gcc zlib-dev libc-dev bsd-compat-headers py-setuptools bash
 
-WORKDIR /app
+WORKDIR /opt/node_app
 
-COPY package.json /app/package.json
-COPY package-lock.json /app/package-lock.json
+COPY package.json package-lock.json* ./
 
 RUN npm ci
+RUN npm cache clean --force
 
 FROM node:10.14.1-alpine
 
-RUN apk --no-cache add libsasl openssl lz4-libs
+RUN apk --no-cache add libsasl openssl lz4-libs netcat-openbsd
 
-WORKDIR /app
+WORKDIR /opt/node_app/app
 
-COPY --from=builder /app/node_modules /app/node_modules
+ENV PATH /opt/node_app/node_modules/.bin:$PATH
 
-COPY . /app
+COPY --from=builder /opt/node_app/node_modules /opt/node_app/node_modules
+
+COPY . .
 
 EXPOSE 3000
 

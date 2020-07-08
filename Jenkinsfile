@@ -2,23 +2,13 @@
 
 import net.santiment.utils.podTemplates
 
-properties([
-  buildDiscarder(
-    logRotator(
-      artifactDaysToKeepStr: '30',
-      artifactNumToKeepStr: '',
-      daysToKeepStr: '30',
-      numToKeepStr: ''
-    )
-  )
-])
-
 slaveTemplates = new podTemplates()
 
-slaveTemplates.dockerComposeTemplate { label ->
+slaveTemplates.dockerTemplate { label ->
   node(label) {
-    container('docker-compose') {
+    container('docker') {
       def scmVars = checkout scm
+      def imageName = "utxo-blocks-exporter"
 
       stage('Build image') {
         withCredentials([string(credentialsId: 'aws_account_id', variable: 'aws_account_id')]) {
@@ -26,11 +16,11 @@ slaveTemplates.dockerComposeTemplate { label ->
 
           docker.withRegistry("https://${awsRegistry}", "ecr:eu-central-1:ecr-credentials") {
             sh "docker build \
-              -t ${awsRegistry}/utxo-blocks-exporter:${env.BRANCH_NAME} \
-              -t ${awsRegistry}/utxo-blocks-exporter:${scmVars.GIT_COMMIT} \
+              -t ${awsRegistry}/${imageName}:${env.BRANCH_NAME} \
+              -t ${awsRegistry}/${imageName}:${scmVars.GIT_COMMIT} \
               -f docker/Dockerfile ."
-            sh "docker push ${awsRegistry}/utxo-blocks-exporter:${env.BRANCH_NAME}"
-            sh "docker push ${awsRegistry}/utxo-blocks-exporter:${scmVars.GIT_COMMIT}"
+            sh "docker push ${awsRegistry}/${imageName}:${env.BRANCH_NAME}"
+            sh "docker push ${awsRegistry}/${imageName}:${scmVars.GIT_COMMIT}"
           }
         }
       }

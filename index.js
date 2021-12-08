@@ -67,8 +67,8 @@ const decodeTransaction = async (transaction_bytecode) => {
 
 const getTransactionData = async (transaction_hashes) => {
   const decodedTransactions = []
-  for (const transaction_hash in transaction_hashes){
-    let transactionBytecode = await sendRequest('getrawtransaction', [transaction_hashes[transaction_hash]])
+  for (const transaction_hash of transaction_hashes){
+    let transactionBytecode = await sendRequest('getrawtransaction', [transaction_hash])
     let decodedTransaction = await decodeTransaction(transactionBytecode)
     decodedTransactions.push(decodedTransaction)
   }

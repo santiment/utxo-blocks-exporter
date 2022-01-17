@@ -17,6 +17,7 @@ const RPC_USERNAME = process.env.RPC_USERNAME || 'rpcuser'
 const RPC_PASSWORD = process.env.RPC_PASSWORD || 'rpcpassword'
 const EXPORT_TIMEOUT_MLS = parseInt(process.env.EXPORT_TIMEOUT_MLS || 1000 * 60 * 15)     // 15 minutes
 const DOGE = parseInt(process.env.DOGE || "0")
+const MAX_CONCURRENT_REQUESTS = parseInt(process.env.MAX_CONCURRENT_REQUESTS || "10")
 
 const request = rp.defaults({
   method: 'POST',
@@ -61,17 +62,24 @@ const sendRequest = (async (method, params) => {
   })
 })
 
-const decodeTransaction = async (transaction_bytecode) => {
-  return await sendRequest('decoderawtransaction', [transaction_bytecode])
-}
-
-const getTransactionData = async (transaction_hashes) => {
-  const decodedTransactions = []
+const getDogeTransactionData = async (transaction_hashes) => {
+  listPromises = []
+  decodedTransactions=[]
   for (const transaction_hash of transaction_hashes){
-    let transactionBytecode = await sendRequest('getrawtransaction', [transaction_hash])
-    let decodedTransaction = await decodeTransaction(transactionBytecode)
-    decodedTransactions.push(decodedTransaction)
+    let promise = sendRequest('getrawtransaction', [transaction_hash]).then(value =>{
+      return sendRequest('decoderawtransaction', [value]).then(decodedTransaction =>{
+        return decodedTransaction
+      })
+    })
+    listPromises.push(promise)
+    if (listPromises.length >= MAX_CONCURRENT_REQUESTS) {
+      let newDecodedTransactions = await Promise.all(listPromises)
+      listPromises = []
+      decodedTransactions = decodedTransactions.concat(newDecodedTransactions)
+    }
   }
+  newDecodedTransactions = await Promise.all(listPromises);
+  decodedTransactions = decodedTransactions.concat(newDecodedTransactions)
   return decodedTransactions
 }
 
@@ -79,7 +87,7 @@ const fetchBlock = async (block_index) => {
   let blockHash = await sendRequest('getblockhash', [block_index])
   if (DOGE){
      let blockData = await sendRequest('getblock', [blockHash, true])
-     let transactionData = await getTransactionData(blockData.tx)
+     let transactionData = await getDogeTransactionData(blockData.tx)
      blockData["tx"] = transactionData
      return blockData
   }

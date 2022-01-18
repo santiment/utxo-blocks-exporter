@@ -16,7 +16,7 @@ const NODE_URL = process.env.NODE_URL || 'http://litecoin.stage.san:30992'
 const RPC_USERNAME = process.env.RPC_USERNAME || 'rpcuser'
 const RPC_PASSWORD = process.env.RPC_PASSWORD || 'rpcpassword'
 const EXPORT_TIMEOUT_MLS = parseInt(process.env.EXPORT_TIMEOUT_MLS || 1000 * 60 * 15)     // 15 minutes
-const DOGE = process.env.DOGE || 0
+const DOGE = parseInt(process.env.DOGE || "0")
 
 const request = rp.defaults({
   method: 'POST',

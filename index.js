@@ -40,6 +40,8 @@ let lastProcessedPosition = {
   blockNumber: parseInt(process.env.BLOCK || "1"),
 }
 
+let currentNodeBlock = 0
+
 const sendRequest = (async (method, params) => {
   metrics.requestsCounter.inc()
 
@@ -64,10 +66,10 @@ const sendRequest = (async (method, params) => {
 
 const getDogeTransactionData = async (transaction_hashes) => {
   listPromises = []
-  decodedTransactions=[]
-  for (const transaction_hash of transaction_hashes){
-    let promise = sendRequest('getrawtransaction', [transaction_hash]).then(value =>{
-      return sendRequest('decoderawtransaction', [value]).then(decodedTransaction =>{
+  decodedTransactions = []
+  for (const transaction_hash of transaction_hashes) {
+    let promise = sendRequest('getrawtransaction', [transaction_hash]).then(value => {
+      return sendRequest('decoderawtransaction', [value]).then(decodedTransaction => {
         return decodedTransaction
       })
     })
@@ -85,29 +87,29 @@ const getDogeTransactionData = async (transaction_hashes) => {
 
 const fetchBlock = async (block_index) => {
   let blockHash = await sendRequest('getblockhash', [block_index])
-  if (DOGE){
-     let blockData = await sendRequest('getblock', [blockHash, true])
-     let transactionData = await getDogeTransactionData(blockData.tx)
-     blockData["tx"] = transactionData
-     return blockData
+  if (DOGE) {
+    let blockData = await sendRequest('getblock', [blockHash, true])
+    let transactionData = await getDogeTransactionData(blockData.tx)
+    blockData["tx"] = transactionData
+    return blockData
   }
   return await sendRequest('getblock', [blockHash, 2])
 }
 
 async function work() {
   const blockchainInfo = await sendRequest('getblockchaininfo', [])
-  const currentBlock = blockchainInfo.blocks - CONFIRMATIONS
+  currentNodeBlock = blockchainInfo.blocks - CONFIRMATIONS
 
-  metrics.currentBlock.set(currentBlock)
+  metrics.currentBlock.set(currentNodeBlock)
 
   const requests = []
 
-  while (lastProcessedPosition.blockNumber + requests.length <= currentBlock) {
+  while (lastProcessedPosition.blockNumber + requests.length <= currentNodeBlock) {
     const blockToDownload = lastProcessedPosition.blockNumber + requests.length
 
     requests.push(fetchBlock(blockToDownload))
 
-    if (requests.length >= SEND_BATCH_SIZE || blockToDownload == currentBlock) {
+    if (requests.length >= SEND_BATCH_SIZE || blockToDownload == currentNodeBlock) {
       const blocks = await Promise.all(requests).map(async (block) => {
         metrics.downloadedTransactionsCounter.inc(block.tx.length)
         metrics.downloadedBlocksCounter.inc()
@@ -160,21 +162,22 @@ init()
 
 const healthcheckKafka = () => {
   if (exporter.producer.isConnected()) {
-      return Promise.resolve()
+    return Promise.resolve()
   } else {
-      return Promise.reject("Kafka client is not connected to any brokers")
+    return Promise.reject("Kafka client is not connected to any brokers")
   }
 }
 
 const healthcheckExportTimeout = () => {
-    const timeFromLastExport = Date.now() - lastExportTime
-    const isExportTimeoutExceeded = timeFromLastExport > EXPORT_TIMEOUT_MLS
-    if (isExportTimeoutExceeded) {
-        const msg = `Time from the last export ${timeFromLastExport}ms exceeded limit  ${EXPORT_TIMEOUT_MLS}ms.`
-        return Promise.reject(msg)
-    } else {
-        return Promise.resolve()
-    }
+  const timeFromLastExport = Date.now() - lastExportTime
+  const isExportTimeoutExceeded = timeFromLastExport > EXPORT_TIMEOUT_MLS
+  if (isExportTimeoutExceeded) {
+    const msg = `Time from the last export ${timeFromLastExport}ms exceeded limit  ${EXPORT_TIMEOUT_MLS}ms.\
+ Last Node block: ${currentNodeBlock}`
+    return Promise.reject(msg)
+  } else {
+    return Promise.resolve()
+  }
 }
 
 module.exports = async (request, response) => {
@@ -182,11 +185,13 @@ module.exports = async (request, response) => {
 
   switch (req.pathname) {
     case '/healthcheck':
-    return healthcheckKafka()
+      return healthcheckKafka()
         .then(() => healthcheckExportTimeout())
         .then(() => send(response, 200, "ok"))
-        .catch((err) => send(response, 500, err.toString()))
-
+        .catch((err) => {
+          logger.error(`Healthcheck failed: ${err.toString()}`)
+          send(response, 500, err.toString())
+        })
     case '/metrics':
       response.setHeader('Content-Type', metrics.register.contentType);
       return send(response, 200, metrics.register.metrics())

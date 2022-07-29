@@ -86,6 +86,7 @@ const getDogeTransactionData = async (transaction_hashes) => {
 }
 
 const fetchBlock = async (block_index) => {
+  logger.debug(`Fetching block ${block_index}`)
   let blockHash = await sendRequest('getblockhash', [block_index])
   if (DOGE) {
     let blockData = await sendRequest('getblock', [blockHash, true])
@@ -99,6 +100,7 @@ const fetchBlock = async (block_index) => {
 async function work() {
   const blockchainInfo = await sendRequest('getblockchaininfo', [])
   currentNodeBlock = blockchainInfo.blocks - CONFIRMATIONS
+  logger.debug(`Last node block is ${blockchainInfo.blocks} we apply ${CONFIRMATIONS} confirmations`)
 
   metrics.currentBlock.set(currentNodeBlock)
 

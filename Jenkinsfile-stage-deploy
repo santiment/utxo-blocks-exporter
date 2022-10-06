@@ -1,0 +1,40 @@
+@Library('podTemplateLib')
+
+import net.santiment.utils.podTemplates
+
+slaveTemplates = new podTemplates()
+
+slaveTemplates.dockerTemplate { label ->
+    node(label) {
+        container('docker') {
+            def imageName = "utxo-blocks-exporter"
+            def stageName = "stage"
+
+            def scmVars = checkout scm
+            def gitCommit = scmVars.GIT_COMMIT
+
+            withCredentials([string(credentialsId: 'aws_account_id', variable: 'aws_account_id')]) {
+                def awsRegistry = "${env.aws_account_id}.dkr.ecr.eu-central-1.amazonaws.com"
+                def sourceImage = "${awsRegistry}/${imageName}"
+                def taggedSource = "${sourceImage}:${gitCommit}"
+
+                stage("Publish image") {
+                    container('docker') {
+                        def timestampTag = "stage-${env.TIMESTAMP_IMAGE_TAG}"
+                        def taggedStage = "${sourceImage}:${stageName}"
+                        def timestamped = "${sourceImage}:${timestampTag}"
+
+                        docker.withRegistry("https://${awsRegistry}", "ecr:eu-central-1:ecr-credentials") {
+                            sh "docker pull ${taggedSource}"
+                            sh "docker tag ${taggedSource} ${taggedStage}"
+                            sh "docker tag ${taggedSource} ${timestamped}"
+                            sh "docker push ${taggedStage}"
+                            sh "docker push ${timestamped}"
+                        }
+                    }
+
+                }
+            }
+        }
+    }
+}

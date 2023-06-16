@@ -9,14 +9,15 @@ const { logger } = require('./logger')
 
 const exporter = new Exporter(pkg.name)
 
-const SEND_BATCH_SIZE = parseInt(process.env.SEND_BATCH_SIZE || "10")
-const DEFAULT_TIMEOUT = parseInt(process.env.DEFAULT_TIMEOUT || "10000")
-const CONFIRMATIONS = parseInt(process.env.CONFIRMATIONS || "3")
-const NODE_URL = process.env.NODE_URL || 'http://litecoin.stage.san:30992'
+const DOGE = parseInt(process.env.DOGE || "0")
 const RPC_USERNAME = process.env.RPC_USERNAME || 'rpcuser'
 const RPC_PASSWORD = process.env.RPC_PASSWORD || 'rpcpassword'
+const MAX_RETRIES = parseInt(process.env.MAX_RETRIES || '3')
+const CONFIRMATIONS = parseInt(process.env.CONFIRMATIONS || "3")
+const SEND_BATCH_SIZE = parseInt(process.env.SEND_BATCH_SIZE || "10")
+const DEFAULT_TIMEOUT = parseInt(process.env.DEFAULT_TIMEOUT || "10000")
+const NODE_URL = process.env.NODE_URL || 'http://litecoin.stage.san:30992'
 const EXPORT_TIMEOUT_MLS = parseInt(process.env.EXPORT_TIMEOUT_MLS || 1000 * 60 * 30)     // 30 minutes
-const DOGE = parseInt(process.env.DOGE || "0")
 const MAX_CONCURRENT_REQUESTS = parseInt(process.env.MAX_CONCURRENT_REQUESTS || "10")
 
 const request = rp.defaults({
@@ -42,6 +43,27 @@ let lastProcessedPosition = {
 
 let currentNodeBlock = 0
 
+const sendRequestWithRetry = (async (method, params) => {
+  let retries = 0;
+  while (retries < MAX_RETRIES) {
+    try {
+      const response = await sendRequest(method, params).catch(err => Promise.reject(err));
+      if (response.error || response.result === null) {
+        retries++;
+        logger.error(`sendRequest with ${method} failed. Reason: ${response.error}. Retrying for ${retries} time`);
+        continue;
+      }
+      return response;
+    } catch(err) {
+      retries++;
+      logger.error(
+        `Try block in sendRequest for ${method} failed. Reason: ${err.toString()}. Retrying for ${retries} time`
+      );
+    }
+  }
+  return Promise.reject(`sendRequest for ${method} failed after ${MAX_RETRIES} retries`);
+});
+
 const sendRequest = (async (method, params) => {
   metrics.requestsCounter.inc()
 
@@ -61,18 +83,15 @@ const sendRequest = (async (method, params) => {
     }
 
     return result
-  })
+  }).catch(error => Promise.reject(error))
 })
 
 const getDogeTransactionData = async (transaction_hashes) => {
   listPromises = []
   decodedTransactions = []
   for (const transaction_hash of transaction_hashes) {
-    let promise = sendRequest('getrawtransaction', [transaction_hash]).then(value => {
-      return sendRequest('decoderawtransaction', [value]).then(decodedTransaction => {
-        return decodedTransaction
-      })
-    })
+    let promise = sendRequestWithRetry('getrawtransaction', [transaction_hash])
+      .then(value => sendRequestWithRetry('decoderawtransaction', [value]))
     listPromises.push(promise)
     if (listPromises.length >= MAX_CONCURRENT_REQUESTS) {
       let newDecodedTransactions = await Promise.all(listPromises)
@@ -87,18 +106,18 @@ const getDogeTransactionData = async (transaction_hashes) => {
 
 const fetchBlock = async (block_index) => {
   logger.debug(`Fetching block ${block_index}`)
-  let blockHash = await sendRequest('getblockhash', [block_index])
+  let blockHash = await sendRequestWithRetry('getblockhash', [block_index])
   if (DOGE) {
-    let blockData = await sendRequest('getblock', [blockHash, true])
+    let blockData = await sendRequestWithRetry('getblock', [blockHash, true])
     let transactionData = await getDogeTransactionData(blockData.tx)
     blockData["tx"] = transactionData
     return blockData
   }
-  return await sendRequest('getblock', [blockHash, 2])
+  return await sendRequestWithRetry('getblock', [blockHash, 2])
 }
 
 async function work() {
-  const blockchainInfo = await sendRequest('getblockchaininfo', [])
+  const blockchainInfo = await sendRequestWithRetry('getblockchaininfo', [])
   currentNodeBlock = blockchainInfo.blocks - CONFIRMATIONS
   logger.debug(`Last node block is ${blockchainInfo.blocks} we apply ${CONFIRMATIONS} confirmations`)
 
